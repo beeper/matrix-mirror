@@ -122,6 +122,18 @@ CREATE TABLE sync_state (
   value TEXT NOT NULL
 );
 `,
+	// Legacy redaction rows have no room and may come from encrypted payloads, so they're dropped.
+	`
+DROP TABLE redactions;
+CREATE TABLE redactions (
+  event_id TEXT PRIMARY KEY,
+  redacts  TEXT NOT NULL,
+  room_id  TEXT NOT NULL,
+  sender   TEXT NOT NULL,
+  ts       INTEGER NOT NULL
+);
+CREATE INDEX redactions_redacts ON redactions(redacts);
+`,
 }
 
 func migrate(ctx context.Context, db *sql.DB) error {

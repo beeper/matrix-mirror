@@ -132,13 +132,13 @@ func TestRedactionBeforeAndAfterMessage(t *testing.T) {
 	w, r, ctx := setup(t)
 	apply(t, w, ctx, func(b *Batch) {
 		joinRoom(b, "")
-		b.Redactions = append(b.Redactions, Redaction{EventID: "$r1", Redacts: "$early", TS: 500})
+		b.Redactions = append(b.Redactions, Redaction{EventID: "$r1", Redacts: "$early", RoomID: room, Sender: alice, TS: 500})
 	})
 	apply(t, w, ctx, func(b *Batch) {
 		b.Messages = append(b.Messages, text("$early", alice, 100, "secret one"), text("$late", alice, 200, "secret two"))
 	})
 	apply(t, w, ctx, func(b *Batch) {
-		b.Redactions = append(b.Redactions, Redaction{EventID: "$r2", Redacts: "$late", TS: 600})
+		b.Redactions = append(b.Redactions, Redaction{EventID: "$r2", Redacts: "$late", RoomID: room, Sender: alice, TS: 600})
 	})
 	for _, eventID := range []id.EventID{"$early", "$late"} {
 		if m := readOne(t, r, ctx, eventID); !m.Redacted || m.Body != nil {
@@ -147,6 +147,27 @@ func TestRedactionBeforeAndAfterMessage(t *testing.T) {
 	}
 	if results, _ := r.Search(ctx, "secret", SearchFilter{}); len(results) != 0 {
 		t.Fatalf("redacted bodies still searchable: %d", len(results))
+	}
+}
+
+func TestRedactionFromOtherRoomIgnored(t *testing.T) {
+	w, r, ctx := setup(t)
+	const other = id.RoomID("!other:example.org")
+	const mallory = id.UserID("@mallory:example.org")
+	apply(t, w, ctx, func(b *Batch) {
+		joinRoom(b, "")
+		b.Redactions = append(b.Redactions, Redaction{EventID: "$r1", Redacts: "$early", RoomID: other, Sender: mallory, TS: 500})
+	})
+	apply(t, w, ctx, func(b *Batch) {
+		b.Messages = append(b.Messages, text("$early", alice, 100, "keep one"), text("$late", alice, 200, "keep two"))
+	})
+	apply(t, w, ctx, func(b *Batch) {
+		b.Redactions = append(b.Redactions, Redaction{EventID: "$r2", Redacts: "$late", RoomID: other, Sender: mallory, TS: 600})
+	})
+	for _, eventID := range []id.EventID{"$early", "$late"} {
+		if m := readOne(t, r, ctx, eventID); m.Redacted || m.Body == nil {
+			t.Fatalf("%s redacted from another room: %+v", eventID, m)
+		}
 	}
 }
 

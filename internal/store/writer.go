@@ -303,7 +303,7 @@ func (a *applier) message(m *Message) error {
 		return err
 	}
 	if _, err = a.exec(`UPDATE messages SET body = NULL, attachment = NULL, redacted = 1
-		WHERE event_id = ? AND EXISTS (SELECT 1 FROM redactions WHERE redacts = ?)`, m.EventID, m.EventID); err != nil {
+		WHERE event_id = ? AND EXISTS (SELECT 1 FROM redactions WHERE redacts = ? AND room_id = ?)`, m.EventID, m.EventID, m.RoomID); err != nil {
 		return err
 	}
 	if _, err = a.exec("UPDATE rooms SET last_event_ts = MAX(COALESCE(last_event_ts, 0), ?) WHERE room_id = ?", m.TS, m.RoomID); err != nil {
@@ -359,14 +359,14 @@ func (a *applier) edit(e Edit) error {
 }
 
 func (a *applier) redaction(r Redaction) error {
-	if _, err := a.exec("INSERT INTO redactions (redacts, event_id, ts) VALUES (?, ?, ?) ON CONFLICT(redacts) DO NOTHING",
-		r.Redacts, r.EventID, r.TS); err != nil {
+	if _, err := a.exec("INSERT INTO redactions (event_id, redacts, room_id, sender, ts) VALUES (?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING",
+		r.EventID, r.Redacts, r.RoomID, r.Sender, r.TS); err != nil {
 		return err
 	}
-	if _, err := a.exec("UPDATE messages SET body = NULL, attachment = NULL, redacted = 1 WHERE event_id = ?", r.Redacts); err != nil {
+	if _, err := a.exec("UPDATE messages SET body = NULL, attachment = NULL, redacted = 1 WHERE event_id = ? AND room_id = ?", r.Redacts, r.RoomID); err != nil {
 		return err
 	}
-	_, err := a.exec("DELETE FROM edits WHERE event_id = ?", r.Redacts)
+	_, err := a.exec("DELETE FROM edits WHERE event_id = ? AND target IN (SELECT event_id FROM messages WHERE room_id = ?)", r.Redacts, r.RoomID)
 	return err
 }
 
