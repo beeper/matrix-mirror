@@ -50,6 +50,8 @@ type Edit struct {
 type Redaction struct {
 	EventID id.EventID
 	Redacts id.EventID
+	RoomID  id.RoomID
+	Sender  id.UserID
 	TS      int64
 }
 

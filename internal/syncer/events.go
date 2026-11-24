@@ -103,8 +103,6 @@ func (s *Syncer) handleEncrypted(ctx context.Context, b *store.Batch, evt *event
 	switch decrypted.Type {
 	case event.EventMessage, event.EventSticker:
 		isMessage = addMessageLike(b, decrypted, store.StatusOK)
-	case event.EventRedaction:
-		addRedaction(b, decrypted)
 	}
 	if !isMessage {
 		b.Discard = append(b.Discard, evt.ID)
@@ -185,7 +183,7 @@ func addRedaction(b *store.Batch, evt *event.Event) {
 		redacts = content.Redacts
 	}
 	if redacts != "" {
-		b.Redactions = append(b.Redactions, store.Redaction{EventID: evt.ID, Redacts: redacts, TS: evt.Timestamp})
+		b.Redactions = append(b.Redactions, store.Redaction{EventID: evt.ID, Redacts: redacts, RoomID: evt.RoomID, Sender: evt.Sender, TS: evt.Timestamp})
 	}
 }
 
